@@ -1,0 +1,8 @@
+{
+  "name": "Mokshamrit Trading Company",
+  "description": "Premium enterprise-grade full-stack website for Mokshamrit Trading Company, a global leader in scrap trading machines, apparel, merchandise, leather goods, agricultural commodities, metal scrap, electronics, and furniture trading.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
