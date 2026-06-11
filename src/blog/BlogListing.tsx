@@ -6,6 +6,7 @@
 import { useState, useEffect } from "react";
 import { Search, ChevronRight, Eye, Calendar, User, ArrowRight } from "lucide-react";
 import { BlogItem, BlogCategory } from "../types";
+import API_ENDPOINTS from "@/src/api/apiCall";
 
 interface BlogListingProps {
   onSelectBlog: (slug: string) => void;
@@ -28,33 +29,73 @@ export default function BlogListing({ onSelectBlog }: BlogListingProps) {
 
   const fetchCategories = async () => {
     try {
-      const res = await fetch("/api/blog_categories");
+      const res = await fetch(API_ENDPOINTS.CATEGORY_GET, {
+        headers: {
+          "Content-Type": "application/json"
+        }
+      });
       if (res.ok) {
         const data = await res.json();
-        setCategories(data);
+        // Handle response format: { success: true, data: [] }
+        if (data.success && data.data) {
+          setCategories(data.data);
+        } else if (Array.isArray(data)) {
+          setCategories(data);
+        } else {
+          setCategories([]);
+        }
       }
     } catch (err) {
-      console.error(err);
+      console.error("Error fetching categories:", err);
     }
   };
 
   const fetchBlogs = async () => {
     setLoading(true);
     try {
-      let url = "/api/blogs?includeUnpublished=false";
-      if (selectedCategory !== "all") {
-        url += `&category=${encodeURIComponent(selectedCategory)}`;
-      }
-      if (searchQuery.trim()) {
-        url += `&search=${encodeURIComponent(searchQuery)}`;
-      }
-      const res = await fetch(url);
+      const res = await fetch(API_ENDPOINTS.BLOG_GET, {
+        headers: {
+          "Content-Type": "application/json"
+        }
+      });
+      
       if (res.ok) {
         const data = await res.json();
-        setBlogs(data);
+        let allBlogs = [];
+        
+        // Handle response format
+        if (data.success && data.data) {
+          allBlogs = data.data;
+        } else if (Array.isArray(data)) {
+          allBlogs = data;
+        }
+        
+        // Filter only published blogs
+        let filteredBlogs = allBlogs.filter((blog: BlogItem) => Boolean(blog.published));
+        
+        // Filter by category
+        if (selectedCategory !== "all") {
+          filteredBlogs = filteredBlogs.filter(
+            (blog: BlogItem) => blog.categoryId?.toString() === selectedCategory || blog.categoryName === selectedCategory
+          );
+        }
+        
+        // Filter by search query
+        if (searchQuery.trim()) {
+          const query = searchQuery.toLowerCase();
+          filteredBlogs = filteredBlogs.filter(
+            (blog: BlogItem) =>
+              blog.title.toLowerCase().includes(query) ||
+              blog.summary?.toLowerCase().includes(query) ||
+              blog.content?.toLowerCase().includes(query) ||
+              blog.author?.toLowerCase().includes(query)
+          );
+        }
+        
+        setBlogs(filteredBlogs);
       }
     } catch (err) {
-      console.error(err);
+      console.error("Error fetching blogs:", err);
     } finally {
       setLoading(false);
     }
@@ -95,9 +136,9 @@ export default function BlogListing({ onSelectBlog }: BlogListingProps) {
           {categories.map((cat) => (
             <button
               key={cat.id}
-              onClick={() => setSelectedCategory(cat.slug)}
+              onClick={() => setSelectedCategory(cat.id.toString())}
               className={`px-4 py-2 rounded text-xs font-semibold uppercase tracking-wider transition shadow-sm ${
-                selectedCategory === cat.slug
+                selectedCategory === cat.id.toString()
                   ? "bg-slate-900 text-white"
                   : "bg-white text-slate-600 border border-slate-200 hover:text-slate-900 hover:bg-slate-50"
               }`}
@@ -131,13 +172,16 @@ export default function BlogListing({ onSelectBlog }: BlogListingProps) {
                 {/* Header Image backdrop */}
                 <div className="relative h-48 w-full overflow-hidden">
                   <img
-                    src={blog.image}
+                    src={blog.image || "https://images.unsplash.com/photo-1547949003-9792a18a2601?auto=format&fit=crop&w=800&q=80"}
                     alt={blog.title}
                     referrerPolicy="no-referrer"
-                    className="w-full h-full object-cover transition-transform duration-350 group-hover:scale-103"
+                    className="w-full h-full object-cover transition-transform duration-350 group-hover:scale-105"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1547949003-9792a18a2601?auto=format&fit=crop&w=800&q=80";
+                    }}
                   />
                   <div className="absolute top-3 left-3 bg-slate-900 text-white font-mono font-bold text-[9px] uppercase tracking-wider px-2 py-0.5 rounded shadow-sm">
-                    {blog.categoryName}
+                    {blog.categoryName || "General"}
                   </div>
                 </div>
 
@@ -147,10 +191,10 @@ export default function BlogListing({ onSelectBlog }: BlogListingProps) {
                     <div className="flex items-center space-x-3 text-[10px] text-slate-500 font-mono">
                       <span className="flex items-center space-x-1">
                         <Calendar className="w-3.5 h-3.5 text-slate-450" />
-                        <span>{new Date(blog.createdDate).toLocaleDateString()}</span>
+                        <span>{blog.createdDate ? new Date(blog.createdDate).toLocaleDateString() : "Recent"}</span>
                       </span>
                       <span>&bull;</span>
-                      <span>{blog.readTime}</span>
+                      <span>{blog.readTime || "5 min read"}</span>
                     </div>
 
                     <h3 
@@ -168,12 +212,12 @@ export default function BlogListing({ onSelectBlog }: BlogListingProps) {
                   <div className="pt-4 border-t border-slate-200 flex items-center justify-between text-xs font-mono text-slate-500">
                     <span className="flex items-center space-x-1 text-slate-500 font-sans text-[11px]">
                       <User className="w-3.5 h-3.5 text-slate-500" />
-                      <span>{blog.author.split(",")[0]}</span>
+                      <span>{blog.author?.split(",")[0] || "Admin"}</span>
                     </span>
 
                     <button
                       onClick={() => onSelectBlog(blog.slug)}
-                      className="text-slate-805 hover:text-slate-950 hover:underline inline-flex items-center space-x-1 cursor-pointer font-bold uppercase text-[10px]"
+                      className="text-slate-800 hover:text-slate-950 hover:underline inline-flex items-center space-x-1 cursor-pointer font-bold uppercase text-[10px]"
                       id={`read-blog-btn-${blog.slug}`}
                     >
                       <span>Read Report</span>

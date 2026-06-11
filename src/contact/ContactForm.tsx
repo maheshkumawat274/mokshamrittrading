@@ -5,6 +5,7 @@
 
 import { useState, FormEvent } from "react";
 import { Send, CheckCircle, AlertTriangle, HelpCircle } from "lucide-react";
+import API_ENDPOINTS from "../api/apiCall";
 
 export default function ContactForm() {
   const [formData, setFormData] = useState({
@@ -31,44 +32,64 @@ export default function ContactForm() {
   ];
 
   const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setSuccessMsg("");
-    setErrorMsg("");
+  e.preventDefault();
 
-    // Validate standard constraints
-    if (!formData.name.trim() || !formData.email.trim() || !formData.message.trim()) {
-      setErrorMsg("Mandatory specifications missing. Name, Email, and Message are required.");
-      return;
-    }
+  setSuccessMsg("");
+  setErrorMsg("");
 
-    setLoading(true);
+  if (
+    !formData.name.trim() ||
+    !formData.email.trim() ||
+    !formData.message.trim()
+  ) {
+    setErrorMsg(
+      "Mandatory specifications missing. Name, Email, and Message are required."
+    );
+    return;
+  }
 
-    try {
-      const res = await fetch("/api/inquiries", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData)
+  setLoading(true);
+
+  try {
+    const response = await fetch(API_ENDPOINTS.CONTACT_CREATE, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(formData),
+    });
+
+    const data = await response.json();
+
+    if (data.success) {
+      setSuccessMsg(
+        data.message ||
+          "Thank you! Your communication has been dispatched to our trade desks."
+      );
+
+      setFormData({
+        name: "",
+        email: "",
+        phone: "",
+        subject: "Metal Scrap Reclamation Division Sourcing",
+        message: "",
       });
-      const data = await res.json();
-
-      if (res.ok) {
-        setSuccessMsg(data.message || "Thank you! Your communication has been dispatched to our trade desks.");
-        setFormData({
-          name: "",
-          email: "",
-          phone: "",
-          subject: "Metal Scrap Reclamation Division Sourcing",
-          message: ""
-        });
-      } else {
-        setErrorMsg(data.error || "Compliance block triggered. Form not submitted.");
-      }
-    } catch (err) {
-      setErrorMsg("Terminal network connection loss. Please try again.");
-    } finally {
-      setLoading(false);
+    } else {
+      setErrorMsg(
+        data.message ||
+          "Compliance block triggered. Form not submitted."
+      );
     }
-  };
+  } catch (error) {
+    console.error(error);
+
+    setErrorMsg(
+      "Terminal network connection loss. Please try again."
+    );
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div id="contact-form-component" className="bg-slate-50 border border-slate-200 rounded-xl p-6 sm:p-8 shadow-md font-sans text-slate-700">

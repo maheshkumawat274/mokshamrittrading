@@ -11,6 +11,7 @@ import AdminInquiries from "./components/AdminInquiries";
 import AdminSettings from "./components/AdminSettings";
 import AdminApiEndpoints from "./components/AdminApiEndpoints";
 import type { BlogCategory, BlogItem, ContactInquiry, GlobalSettings } from "../types";
+import API_ENDPOINTS from "@/src/api/apiCall";
 
 export default function AdminPanel() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
@@ -52,42 +53,96 @@ export default function AdminPanel() {
   const fetchAdminData = async () => {
     const headers = getAuthHeader();
     try {
-      // Inquiries
-      const inqRes = await fetch("/api/inquiries", { headers });
+      // Inquiries - GET all contact inquiries
+      const inqRes = await fetch(API_ENDPOINTS.CONTACT_GET, { 
+        headers: {
+          ...headers,
+          "Content-Type": "application/json"
+        }
+      });
       if (inqRes.ok) {
         const inqData = await inqRes.json();
-        setInquiries(inqData);
+        // Handle response format
+        if (inqData.success && inqData.data) {
+          setInquiries(inqData.data);
+        } else if (Array.isArray(inqData)) {
+          setInquiries(inqData);
+        } else {
+          setInquiries([]);
+        }
+        console.log("Inquiries loaded:", inqData);
+      } else {
+        console.error("Failed to fetch inquiries, status:", inqRes.status);
+        setInquiries([]);
       }
 
-      // Blogs
-      const blogRes = await fetch("/api/blogs?includeUnpublished=true");
+      // Blogs - GET all blogs
+      const blogRes = await fetch(API_ENDPOINTS.BLOG_GET, { 
+        headers: {
+          ...headers,
+          "Content-Type": "application/json"
+        }
+      });
       if (blogRes.ok) {
         const bData = await blogRes.json();
-        setBlogs(bData);
+        // Handle response format
+        if (bData.success && bData.data) {
+          setBlogs(bData.data);
+        } else if (Array.isArray(bData)) {
+          setBlogs(bData);
+        } else {
+          setBlogs([]);
+        }
+        console.log("Blogs loaded:", bData);
+      } else {
+        console.error("Failed to fetch blogs, status:", blogRes.status);
+        setBlogs([]);
       }
 
-      // Categories
-      const catRes = await fetch("/api/blog_categories");
+      // Categories - GET all categories
+      const catRes = await fetch(API_ENDPOINTS.CATEGORY_GET, { 
+        headers: {
+          ...headers,
+          "Content-Type": "application/json"
+        }
+      });
       if (catRes.ok) {
         const cData = await catRes.json();
-        setCategories(cData);
+        // Handle response format: { success: true, count: number, data: [] }
+        if (cData.success && cData.data) {
+          setCategories(cData.data);
+        } else if (Array.isArray(cData)) {
+          setCategories(cData);
+        } else {
+          setCategories([]);
+        }
+        console.log("Categories loaded:", cData);
+      } else {
+        console.error("Failed to fetch categories, status:", catRes.status);
+        setCategories([]);
       }
 
-      // Settings
-      const setRes = await fetch("/api/settings");
-      if (setRes.ok) {
-        const sData = await setRes.json();
-        setSettings(sData);
+      // Settings - You need to create this endpoint or remove if not available
+      try {
+        const setRes = await fetch("/api/settings");
+        if (setRes.ok) {
+          const sData = await setRes.json();
+          setSettings(sData);
+        }
+      } catch (err) {
+        console.log("Settings endpoint not configured yet");
       }
 
-      // Logs trigger
+      // Activity log
       setRecentActivities(prev => [
-        `[${new Date().toLocaleTimeString()}] Secure Sourcing Database link finalized.`,
-        "Ready to orchestrate CIF & FOB global container trade telemetry.",
-        ...prev
+        `[${new Date().toLocaleTimeString()}] Data sync completed successfully.`,
+        `[${new Date().toLocaleTimeString()}] Total blogs: ${blogs.length}, Categories: ${categories.length}, Inquiries: ${inquiries.length}`,
+        ...prev.slice(0, 13)
       ]);
+      
     } catch (err) {
       console.error("Failure fetching administrative metadata.", err);
+      addActivity(`Error fetching data: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
   };
 

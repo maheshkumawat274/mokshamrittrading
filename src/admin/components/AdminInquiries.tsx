@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Mail, Search, Eye, Trash2, Shield, Calendar, Phone, Globe, MessageSquare, AlertCircle } from "lucide-react";
 import type { ContactInquiry } from "../../types";
+import API_ENDPOINTS from "@/src/api/apiCall";
 
 
 interface AdminInquiriesProps {
@@ -22,23 +23,27 @@ export default function AdminInquiries({ inquiries, fetchAdminData, addActivity,
   );
 
   const handleDeleteInquiry = async (id: number) => {
-    if (!window.confirm("Perform irreversible deletion of this transaction inquiry?")) return;
-    try {
-      const res = await fetch(`/api/inquiries/${id}`, {
-        method: "DELETE",
-        headers: getAuthHeader()
-      });
-      if (res.ok) {
-        addActivity(`Deleted inquiry ID: ${id}`);
-        fetchAdminData();
-        if (selectedInquiry?.id === id) setSelectedInquiry(null);
-      } else {
-        alert("Operation unauthorized or rejected by database engine.");
+  if (!window.confirm("Delete this inquiry?")) return;
+
+  try {
+    const res = await fetch(
+      `${API_ENDPOINTS.CONTACT_DELETE}?id=${id}`
+    );
+
+    const data = await res.json();
+
+    if (data.success) {
+      addActivity(`Deleted inquiry ID: ${id}`);
+      fetchAdminData();
+
+      if (selectedInquiry?.id === id) {
+        setSelectedInquiry(null);
       }
-    } catch (err) {
-      alert("Error dispatched from database controller.");
     }
-  };
+  } catch (error) {
+    console.error(error);
+  }
+};
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-6 space-y-6" id="inquiries-tab-content">

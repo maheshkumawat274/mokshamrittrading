@@ -42,7 +42,6 @@ export default function App() {
             <Route path="/blog" element={<Blog />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/admin" element={<AdminPanel />} />
-            <Route path="/" element={<Home />} />
           </Routes>
         </main>
 

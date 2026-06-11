@@ -6,6 +6,7 @@
 import { useState, useEffect } from "react";
 import { ArrowLeft, User, Calendar, Clock, Sparkles, Share2, CornerDownRight } from "lucide-react";
 import { BlogItem } from "../types";
+import API_ENDPOINTS from "@/src/api/apiCall";
 
 interface BlogDetailsProps {
   slug: string;
@@ -18,27 +19,50 @@ export default function BlogDetails({ slug, onBack }: BlogDetailsProps) {
   const [related, setRelated] = useState<BlogItem[]>([]);
 
   useEffect(() => {
-    fetchBlogDetails();
+    if (slug) {
+      fetchBlogDetails();
+    }
   }, [slug]);
 
   const fetchBlogDetails = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/blogs/${slug}`);
+      // Fetch all blogs from BLOG_GET endpoint
+      const res = await fetch(API_ENDPOINTS.BLOG_GET, {
+        headers: {
+          "Content-Type": "application/json"
+        }
+      });
+      
       if (res.ok) {
         const data = await res.json();
-        setBlog(data);
+        let blogsArray = [];
         
-        // Fetch matching category related entries
-        const relRes = await fetch(`/api/blogs?category=${data.categoryId}`);
-        if (relRes.ok) {
-          const relData = await relRes.json();
-          // Exclude self
-          setRelated(relData.filter((b: BlogItem) => b.id !== data.id).slice(0, 3));
+        // Handle response format
+        if (data.success && data.data) {
+          blogsArray = data.data;
+        } else if (Array.isArray(data)) {
+          blogsArray = data;
+        }
+        
+        // Find blog by slug
+        const foundBlog = blogsArray.find((b: BlogItem) => b.slug === slug);
+        
+        if (foundBlog) {
+          setBlog(foundBlog);
+          
+          // Fetch related blogs by category (excluding current blog)
+          const relatedBlogs = blogsArray.filter(
+            (b: BlogItem) => b.categoryId === foundBlog.categoryId && b.id !== foundBlog.id
+          ).slice(0, 3);
+          
+          setRelated(relatedBlogs);
+        } else {
+          console.error("Blog not found with slug:", slug);
         }
       }
     } catch (err) {
-      console.error(err);
+      console.error("Error fetching blog details:", err);
     } finally {
       setLoading(false);
     }
@@ -52,7 +76,7 @@ export default function BlogDetails({ slug, onBack }: BlogDetailsProps) {
   if (loading) {
     return (
       <div className="py-24 text-center text-xs font-mono text-slate-500 flex flex-col items-center justify-center space-y-4 max-w-7xl mx-auto px-4">
-        <div className="w-8 h-8 border-2 border-slate-905 border-t-transparent rounded-full animate-spin"></div>
+        <div className="w-8 h-8 border-2 border-slate-900 border-t-transparent rounded-full animate-spin"></div>
         <span>Translating deep archive records...</span>
       </div>
     );
@@ -69,8 +93,10 @@ export default function BlogDetails({ slug, onBack }: BlogDetailsProps) {
     );
   }
 
-  // Very simple Markdown parser for headings and bullet points to render contents beautifully
+  // Markdown parser
   const renderParagraphs = (rawContent: string) => {
+    if (!rawContent) return null;
+    
     return rawContent.split("\n\n").map((para, idx) => {
       const trimmed = para.trim();
       if (trimmed.startsWith("##")) {
@@ -115,7 +141,7 @@ export default function BlogDetails({ slug, onBack }: BlogDetailsProps) {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
         <button 
           onClick={onBack}
-          className="inline-flex items-center space-x-2 text-xs font-mono font-bold text-slate-705 hover:text-slate-950 transition cursor-pointer"
+          className="inline-flex items-center space-x-2 text-xs font-mono font-bold text-slate-700 hover:text-slate-950 transition cursor-pointer"
           id="details-back-btn"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -126,7 +152,7 @@ export default function BlogDetails({ slug, onBack }: BlogDetailsProps) {
       {/* Title block */}
       <header className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-6">
         <div className="inline-block px-3 py-1 bg-white border border-slate-200 text-slate-700 font-mono text-[9px] uppercase tracking-widest rounded shadow-sm">
-          {blog.categoryName}
+          {blog.categoryName || "General"}
         </div>
 
         <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight uppercase leading-snug">
@@ -135,18 +161,18 @@ export default function BlogDetails({ slug, onBack }: BlogDetailsProps) {
 
         <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 font-mono border-y border-slate-200 py-4">
           <span className="flex items-center space-x-1">
-            <User className="w-4 h-4 text-slate-650" />
-            <span className="text-slate-600">{blog.author}</span>
+            <User className="w-4 h-4 text-slate-600" />
+            <span className="text-slate-600">{blog.author || "Admin"}</span>
           </span>
           <span className="hidden sm:inline">&bull;</span>
           <span className="flex items-center space-x-1">
-            <Calendar className="w-4 h-4 text-slate-650" />
-            <span>{new Date(blog.createdDate).toLocaleDateString()}</span>
+            <Calendar className="w-4 h-4 text-slate-600" />
+            <span>{blog.createdDate ? new Date(blog.createdDate).toLocaleDateString() : "Recent"}</span>
           </span>
           <span className="hidden sm:inline">&bull;</span>
           <span className="flex items-center space-x-1">
-            <Clock className="w-4 h-4 text-slate-650" />
-            <span>{blog.readTime}</span>
+            <Clock className="w-4 h-4 text-slate-600" />
+            <span>{blog.readTime || "5 min read"}</span>
           </span>
         </div>
       </header>
@@ -155,11 +181,14 @@ export default function BlogDetails({ slug, onBack }: BlogDetailsProps) {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 mb-12">
         <div className="relative h-64 md:h-96 w-full overflow-hidden rounded-xl border border-slate-200 shadow-lg">
           <img
-            src={blog.image}
+            src={blog.image || "https://images.unsplash.com/photo-1547949003-9792a18a2601?auto=format&fit=crop&w=800&q=80"}
             alt={blog.title}
             referrerPolicy="no-referrer"
             className="w-full h-full object-cover"
             id="details-hero-photo"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1547949003-9792a18a2601?auto=format&fit=crop&w=800&q=80";
+            }}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-slate-50 via-slate-50/10 to-transparent"></div>
         </div>
@@ -204,12 +233,12 @@ export default function BlogDetails({ slug, onBack }: BlogDetailsProps) {
                   <div 
                     key={rel.id}
                     onClick={() => {
-                      fetch(`/api/blogs/${rel.slug}`).then(r => r.ok && fetchBlogDetails());
+                      window.location.href = `/blog/${rel.slug}`;
                     }}
                     className="block hover:bg-slate-100 p-2.5 rounded bg-white border border-slate-200 hover:border-slate-400 cursor-pointer shadow-sm transition-all"
                   >
                     <span className="text-slate-900 font-extrabold block uppercase text-[10px] tracking-tight truncate mb-1">{rel.title}</span>
-                    <span className="text-[9px] font-mono text-slate-500 block">By: {rel.author.split(",")[0]}</span>
+                    <span className="text-[9px] font-mono text-slate-500 block">By: {rel.author?.split(",")[0] || "Admin"}</span>
                   </div>
                 ))}
               </div>
